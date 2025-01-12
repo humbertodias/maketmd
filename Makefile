@@ -12,8 +12,13 @@ ifeq ($(OS),Windows_NT)
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
-		CFLAGS += -I/usr/local/opt/openssl/include
-		LFLAGS += -L/usr/local/opt/openssl/lib
+		ifneq ("$(wildcard /opt/homebrew/opt/openssl/include)","")
+			CFLAGS   += -I/opt/homebrew/opt/openssl/include
+			LFLAGS += -L/opt/homebrew/opt/openssl/lib
+		else
+			CFLAGS += -I/usr/local/opt/openssl/include
+			LFLAGS += -L/usr/local/opt/openssl/lib
+		endif		
 	endif
 	TARGET = $(TARGET_NAME)
 endif
