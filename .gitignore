@@ -33,3 +33,5 @@
 
 # MacOS annoying file
 .DS_Store
+.vscode
+maketmd
