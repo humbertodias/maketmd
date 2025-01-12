@@ -33,8 +33,10 @@ distribution.
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
+#include <iostream>
 #include <fstream>
 #include <string>
+#include <openssl/evp.h>
 #include <openssl/sha.h>
 
 #ifdef _WIN32
@@ -117,20 +119,50 @@ void tmd_create(uint8_t* tmd, std::fstream& app) {
 		uint8_t buffer[SHA_BUFFER_SIZE] = { 0 };
 		uint32_t buffer_read = 0;
 		
-		SHA_CTX ctx;
-		SHA1_Init(&ctx);
-		
-		do {
-			app.read((char*)&buffer[0], SHA_BUFFER_SIZE);
-			buffer_read = app.gcount();
-			
-			SHA1_Update(&ctx, buffer, buffer_read);
-		} while(buffer_read == SHA_BUFFER_SIZE);
-		
-		SHA1_Final(buffer, &ctx);
-		
-		// Store SHA1 sum
-		memcpy((tmd + 0x1F4), buffer, SHA_DIGEST_LENGTH);
+		// Use EVP API to compute SHA1 
+		EVP_MD_CTX *mdctx = EVP_MD_CTX_new(); 
+		if (mdctx == nullptr) 
+		{ 
+			std::cerr << "Failed to create EVP context!" << std::endl; 
+			return; 
+		} 
+ 
+		// Initialize the context with SHA1 
+		if (EVP_DigestInit_ex(mdctx, EVP_sha1(), nullptr) != 1) 
+		{ 
+			std::cerr << "EVP_DigestInit_ex failed!" << std::endl; 
+			EVP_MD_CTX_free(mdctx); 
+			return; 
+		} 
+ 
+		do 
+		{ 
+			app.read(reinterpret_cast<char *>(buffer), SHA_BUFFER_SIZE); 
+			buffer_read = app.gcount(); 
+ 
+			// Update the hash with the buffer data 
+			if (EVP_DigestUpdate(mdctx, buffer, buffer_read) != 1) 
+			{ 
+				std::cerr << "EVP_DigestUpdate failed!" << std::endl; 
+				EVP_MD_CTX_free(mdctx); 
+				return; 
+			} 
+		} while (buffer_read == SHA_BUFFER_SIZE); 
+ 
+		// Finalize the hash calculation 
+		unsigned char hash[SHA_DIGEST_LENGTH]; 
+		if (EVP_DigestFinal_ex(mdctx, hash, nullptr) != 1) 
+		{ 
+			std::cerr << "EVP_DigestFinal_ex failed!" << std::endl; 
+			EVP_MD_CTX_free(mdctx); 
+			return; 
+		} 
+ 
+		// Store the computed SHA1 hash 
+		memcpy((tmd + 0x1F4), hash, SHA_DIGEST_LENGTH); 
+ 
+		// Clean up the EVP context 
+		EVP_MD_CTX_free(mdctx); 
 	}
 }
 
